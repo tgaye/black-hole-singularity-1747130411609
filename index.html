@@ -1,0 +1,259 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Hole Singularity</title>
+    <style>
+        body {
+           : 0;
+            padding: 0;
+            overflow: hidden;
+            background-color #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+           : 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            pointer-events: none;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.8.0/lib/p5.js"></script>
+
+<base target="_self">
+
+
+    </head><body><div id="canvas-container"></div>
+    <div id="info">Move mouse to distort spacetime • Click to reset</div>
+
+    <script>
+        const sketch = (p) => {
+            let blackHole;
+            let particles = [];
+            let stars = [];
+            let distortionFactor = 0;
+            let time = 0;
+            let bgGraphics;
+            let rotationSpeed = 0.001;
+            let mouseDistortion = 0;
+            let colorScheme = 0;
+            const colorSchemes = [
+                { disk: [255, 100, 50], glow: [255, 200, 100], bg: [10, 5, 30] },
+                { disk: [150, 50, 255], glow: [200, 150, 255], bg: [20, 10, 40] },
+                { disk: [50, 200, 150], glow: [100, 255, 200], bg: [5, 20, 30] }
+            ];
+
+            p.setup = () => {
+                let canvas = p.createCanvas(p.min(p.windowWidth, 1200), p.min(p.windowHeight, 800), p.WEBGL);
+                canvas.parent('canvas-container');
+                p.colorMode(p.RGB);
+                
+                createStars(500);
+                createAccretionDisk(300);
+                createBackground();
+            };
+
+            function createBackground() {
+                bgGraphics = p.createGraphics(p.width, p.height);
+                bgGraphics.background(colorSchemes[colorScheme].bg);
+                
+                // Create gradient background
+                for (let y = 0; y < bgGraphics.height; y++) {
+                    let inter = p.map(y, 0, bgGraphics.height, 0, 1);
+                    let c = p.lerpColor(
+                        p.color(colorSchemes[colorScheme].bg[0], colorSchemes[colorScheme].bg[1], colorSchemes[colorScheme].bg[2]),
+                        p.color(0),
+                        inter
+                    );
+                    bgGraphics.stroke(c);
+                    bgGraphics.line(0, y, bgGraphics.width, y);
+                }
+            }
+
+            function createStars(count) {
+                stars = [];
+                for (let i = 0; i < count; i++) {
+                    stars.push({
+                        x: p.random(-p.width*2, p.width*2),
+                        y: p.random(-p.height*2, p.height*2),
+                        z: p.random(-2000, 2000),
+                        size: p.random(0.5, 2),
+                        brightness: p.random(100, 255)
+                    });
+                }
+            }
+
+            function createAccretionDisk(count) {
+                particles = [];
+                for (let i = 0; i < count; i++) {
+                    let angle = p.random(p.TWO_PI);
+                    let radius = p.random(100, 300);
+                    let z = p.random(-20, 20);
+                    
+                    // Doppler effect colors (redshift/blueshift)
+                    let doppler = p.map(z, -20, 20, 0, 1);
+                    let r = p.lerp(colorSchemes[colorScheme].disk[0], colorSchemes[colorScheme].glow[0], doppler);
+                    let g = p.lerp(colorSchemes[colorScheme].disk[1], colorSchemes[colorScheme].glow[1], doppler);
+                    let b = p.lerp(colorSchemes[colorScheme].disk[2], colorSchemes[colorScheme].glow[2], doppler);
+                    
+                    particles.push({
+                        x: p.cos(angle) * radius,
+                        y: p.sin(angle) * radius,
+                        z: z,
+                        radius: radius,
+                        angle: angle,
+                        speed: p.map(radius, 100, 300, 0.03, 0.01),
+                        size: p.random(1, 3),
+                        color: p.color(r, g, b, 200)
+                    });
+                }
+            }
+
+            p.draw = () => {
+                time += 0.01;
+                
+                // Calculate mouse influence
+                let mx = p.map(p.mouseX, 0, p.width, -1, 1);
+                let my = p.map(p.mouseY, 0, p.height, -1, 1);
+                mouseDistortion = p.lerp(mouseDistortion, p.dist(mx, my, 0, 0) * 0.5, 0.1);
+                
+                // Draw background
+                p.background(0);
+                p.image(bgGraphics, -p.width/2, -p.height/2);
+                
+                // Draw stars with gravitational lensing
+                p.push();
+                p.rotateY(time * 0.1);
+                drawStars();
+                p.pop();
+                
+                // Black hole and accretion disk
+                p.push();
+                p.rotateY(time * rotationSpeed);
+                drawBlackHole();
+                drawAccretionDisk();
+                p.pop();
+                
+                // Update rotation based on mouse position
+                rotationSpeed = p.map(mx, -1, 1, -0.003, 0.003);
+            };
+
+            function drawStars() {
+                p.noStroke();
+                for (let star of stars) {
+                    // Calculate position with distortion
+                    let dx = star.x;
+                    let dy = star.y;
+                    let dz = star.z;
+                    let dist = p.dist(0, 0, 0, dx, dy, dz);
+                    
+                    // Gravitational lensing effect
+                    if (dist < 500) {
+                        let distortion = p.map(dist, 0, 500, 1.5, 1);
+                        dx *= distortion;
+                        dy *= distortion;
+                    }
+                    
+                    // Add mouse distortion
+                    dx += dx * mouseDistortion * 0.2;
+                    dy += dy * mouseDistortion * 0.2;
+                    
+                    p.push();
+                    p.translate(dx, dy, dz);
+                    p.fill(star.brightness, star.brightness * 0.8, star.brightness * 0.6);
+                    p.sphere(star.size);
+                    p.pop();
+                }
+            }
+
+            function drawBlackHole() {
+                // Event horizon
+                p.push();
+                p.noStroke();
+                p.fill(0);
+                p.sphere(50);
+                
+                // Gravitational distortion effect
+                p.rotateX(time * 0.2);
+                p.rotateY(time * 0.3);
+                p.fill(30, 30, 40, 150);
+                p.sphere(55);
+                p.pop();
+                
+                // Singularity glow
+                p.push();
+                p.noStroke();
+                let glowSize = 30 + p.sin(time * 3) * 5;
+                p.fill(colorSchemes[colorScheme].glow[0], colorSchemes[colorScheme].glow[1], colorSchemes[colorScheme].glow[2], 50);
+                p.sphere(glowSize);
+                p.pop();
+            }
+
+            function drawAccretionDisk() {
+                p.noStroke();
+                for (let particle of particles) {
+                    particle.angle += particle.speed;
+                    
+                    // Update position
+                    particle.x = p.cos(particle.angle) * particle.radius;
+                    particle.y = p.sin(particle.angle) * particle.radius;
+                    
+                    // Draw particle
+                    p.push();
+                    p.translate(particle.x, particle.y, particle.z);
+                    p.fill(particle.color);
+                    p.sphere(particle.size);
+                    p.pop();
+                    
+                    // Draw trail
+                    let trailLength = 5;
+                    for (let i = 1; i <= trailLength; i++) {
+                        let trailAngle = particle.angle - i * 0.02;
+                        let trailX = p.cos(trailAngle) * (particle.radius + i * 0.5);
+                        let trailY = p.sin(trailAngle) * (particle.radius + i * 0.5);
+                        
+                        p.push();
+                        p.translate(trailX, trailY, particle.z);
+                        let alpha = p.map(i, 1, trailLength, 100, 10);
+                        p.fill(particle.color.levels[0], particle.color.levels[1], particle.color.levels[2], alpha);
+                        p.sphere(particle.size * 0.8);
+                        p.pop();
+                    }
+                }
+            }
+
+            p.mousePressed = () => {
+                // Change color scheme on click
+                colorScheme = (colorScheme + 1) % colorSchemes.length;
+                createBackground();
+                createAccretionDisk(300);
+            };
+
+            p.windowResized = () => {
+                p.resizeCanvas(p.min(p.windowWidth, 1200), p.min(p.windowHeight, 800));
+                createBackground();
+            };
+        };
+
+        new p5(sketch);
+    </script>
+
+              
+          
+                
+          
+              
+</body></html>
